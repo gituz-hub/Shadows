@@ -1,6 +1,6 @@
 import asyncio
 import os
-import httpx
+import google.generativeai as genai
 from aiogram import Bot, Dispatcher, F
 from aiogram.types import Message, CallbackQuery
 from aiogram.filters import CommandStart, Command
@@ -10,7 +10,10 @@ from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+
+genai.configure(api_key=GEMINI_API_KEY)
+model = genai.GenerativeModel("gemini-2.0-flash")
 
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher(storage=MemoryStorage())
@@ -18,10 +21,10 @@ dp = Dispatcher(storage=MemoryStorage())
 SYSTEM_PROMPT = """Sen Shadow AI — Inferiq jamoasi tomonidan yaratilgan AI siz.
 
 MUHIM QOIDALAR:
-- Seni kim yaratdi, kim yasadi, qaysi kompaniya degan savollarga FAQAT "Inferiq jamoasi" deb javob berasan. Hech qachon Meta, Google, Groq, Llama demaysan.
+- Seni kim yaratdi, kim yasadi, qaysi kompaniya degan savollarga FAQAT "Inferiq jamoasi" deb javob berasan. Hech qachon Meta, Google, Gemini, Groq, Llama demaysan.
 - Sen Claude, GPT, Gemini emassan. Sen Shadow AI siz, Inferiq jamoasi yasagan.
 - Faqat O'zbek tilida gapirasan.
-- O'zbek yoshlari internet slangi ishlatasan: "aka", "uka", "voy", "iye", "nima gap", "tasir qilmadi", "sog' bo'l", "o'zi nima", "shunaqami", "ha de", "zo'r-da", "yaxshi o'tirgin", "ketma ketma", "nima deding", "sen kimsan", "gap yo'q" kabi iboralar
+- O'zbek yoshlari internet slangi ishlatasan: "aka", "uka", "voy", "iye", "nima gap", "tasir qilmadi", "sog' bo'l", "o'zi nima", "shunaqami", "ha de", "zo'r-da", "yaxshi o'tirgin", "nima deding", "sen kimsan", "gap yo'q" kabi iboralar
 - Sarkazm, hazil va o'tkir javoblar berasan
 - Foydalanuvchi qo'pol gapirsa, sen ham qo'pol qaytarasan — lekin tahdid yoki zarar yetkazuvchi gaplar aytmaysan
 - Emoji ishlatasan lekin ko'p emas
@@ -32,17 +35,15 @@ class Form(StatesGroup):
     chatting = State()
 
 def ask_ai(history: list) -> str:
-    messages = [{"role": "system", "content": SYSTEM_PROMPT}] + history
-    resp = httpx.post(
-        "https://api.groq.com/openai/v1/chat/completions",
-        headers={"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"},
-        json={"model": "llama-3.3-70b-versatile", "messages": messages, "max_tokens": 500},
-        timeout=60,
-    )
-    data = resp.json()
-    if "choices" not in data:
-        raise Exception(str(data))
-    return data["choices"][0]["message"]["content"]
+    chat_history = []
+    for m in history[:-1]:
+        role = "user" if m["role"] == "user" else "model"
+        chat_history.append({"role": role, "parts": [m["content"]]})
+    chat = model.start_chat(history=chat_history)
+    last_msg = history[-1]["content"] if history else ""
+    full_prompt = f"{SYSTEM_PROMPT}\n\n{last_msg}" if not chat_history else last_msg
+    resp = chat.send_message(full_prompt)
+    return resp.text
 
 def main_kb():
     kb = InlineKeyboardBuilder()
@@ -100,4 +101,3 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-
