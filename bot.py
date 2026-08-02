@@ -81,7 +81,7 @@ async def chat(msg: Message, state: FSMContext):
         await thinking.delete()
         await msg.answer(reply, reply_markup=main_kb())
     except Exception as e:
-        await thinking.edit_text(f"e blet xatolik: {e}")
+    await thinking.edit_text(str(e))
 
 @dp.message()
 async def no_state(msg: Message, state: FSMContext):
