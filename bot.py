@@ -51,6 +51,13 @@ def sub_kb():
     kb.adjust(1)
     return kb.as_markup()
 
+def age_kb():
+    kb = InlineKeyboardBuilder()
+    kb.button(text="✅ Ha, 18 yoshdan kattaman", callback_data="age_yes")
+    kb.button(text="❌ Yo'q", callback_data="age_no")
+    kb.adjust(1)
+    return kb.as_markup()
+
 def main_kb():
     kb = InlineKeyboardBuilder()
     kb.button(text="🗑 Tozalash", callback_data="clear")
@@ -84,11 +91,24 @@ async def cmd_start(msg: Message, state: FSMContext):
             reply_markup=sub_kb()
         )
         return
+    await msg.answer(
+        "⚠️ Diqqat!\n\nShadow AI 18+ platforma. Bot qo'pol va erkin tarzda gaplashadi.\n\nYoshingizni tasdiqlang:",
+        reply_markup=age_kb()
+    )
+
+@dp.callback_query(F.data == "age_yes")
+async def age_confirmed(cb: CallbackQuery, state: FSMContext):
     await state.set_state(Form.chatting)
     await state.update_data(history=[])
-    await msg.answer(
+    await cb.message.edit_text(
         "yo 👋\n\nmen Shadow AI — Inferiq jamoasining AIman 😎\ngapir nima desang —",
         reply_markup=main_kb()
+    )
+
+@dp.callback_query(F.data == "age_no")
+async def age_denied(cb: CallbackQuery, state: FSMContext):
+    await cb.message.edit_text(
+        "xo'p aka, sog' bo'l 👋\nKattaroq bo'lgach qayta kel."
     )
 
 @dp.callback_query(F.data == "check_sub")
@@ -121,6 +141,9 @@ async def chat(msg: Message, state: FSMContext):
             "obunangiz yo'q aka 😑\navval kanalga obuna bo'l:",
             reply_markup=sub_kb()
         )
+        return
+    if not msg.text:
+        await msg.answer("matn yoz aka, stiker/rasm qabul qilmayman 😑")
         return
     data = await state.get_data()
     history = data.get("history", [])
