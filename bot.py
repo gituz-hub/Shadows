@@ -137,7 +137,7 @@ def ask_ai(history, admin=False):
 
 # ─── Web API ──────────────────────────────────────────────
 async def handle_index(request):
-    index_path = os.path.join(os.path.dirname(__file__), "miniapp", "index.html")
+    index_path = os.path.join(os.path.dirname(__file__), "index.html")
     with open(index_path) as f:
         return web.Response(text=f.read(), content_type="text/html")
 
