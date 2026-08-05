@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Shadow AI Admin</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #0a0a0a;
+      color: #e2e8f0;
+      min-height: 100vh;
+      padding: 16px;
+    }
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 24px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid #1e293b;
+    }
+    .logo {
+      width: 44px; height: 44px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #7c3aed, #00d4ff);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px;
+    }
+    .header h1 { font-size: 18px; font-weight: 800; }
+    .header p { font-size: 12px; color: #64748b; }
+    .access-denied {
+      text-align: center;
+      padding: 60px 20px;
+      color: #ef4444;
+    }
+    .access-denied h2 { font-size: 20px; margin-bottom: 8px; }
+    .access-denied p { color: #64748b; font-size: 14px; }
+    .stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    .stat-card {
+      background: #111827;
+      border: 1px solid #1e2a3a;
+      border-radius: 14px;
+      padding: 16px;
+    }
+    .stat-card .num {
+      font-size: 28px;
+      font-weight: 900;
+      background: linear-gradient(135deg, #7c3aed, #00d4ff);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .stat-card .label { font-size: 12px; color: #64748b; margin-top: 4px; }
+    .section {
+      background: #111827;
+      border: 1px solid #1e2a3a;
+      border-radius: 14px;
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+    .section h3 { font-size: 14px; font-weight: 700; margin-bottom: 12px; color: #94a3b8; }
+    textarea, input {
+      width: 100%;
+      background: #1e293b;
+      border: 1px solid #2a3a4a;
+      border-radius: 10px;
+      padding: 10px 12px;
+      color: #e2e8f0;
+      font-size: 14px;
+      outline: none;
+      resize: none;
+      font-family: inherit;
+    }
+    textarea { min-height: 80px; }
+    textarea:focus, input:focus { border-color: #7c3aed; }
+    button {
+      width: 100%;
+      padding: 12px;
+      border: none;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      margin-top: 10px;
+      transition: opacity 0.2s;
+    }
+    button:hover { opacity: 0.85; }
+    .btn-primary { background: linear-gradient(135deg, #7c3aed, #00d4ff); color: #fff; }
+    .btn-danger { background: #ef4444; color: #fff; }
+    .btn-success { background: #10b981; color: #fff; }
+    .msg { font-size: 13px; margin-top: 8px; padding: 8px 12px; border-radius: 8px; }
+    .msg.ok { background: #10b98122; color: #10b981; }
+    .msg.err { background: #ef444422; color: #ef4444; }
+    .loading { text-align: center; padding: 40px; color: #64748b; }
+    .users-list { max-height: 200px; overflow-y: auto; }
+    .user-item {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 8px 0;
+      border-bottom: 1px solid #1e293b;
+      font-size: 13px;
+    }
+    .user-item:last-child { border-bottom: none; }
+    .ban-btn {
+      padding: 4px 10px;
+      background: #ef444422;
+      border: 1px solid #ef4444;
+      border-radius: 6px;
+      color: #ef4444;
+      font-size: 11px;
+      cursor: pointer;
+      width: auto;
+      margin: 0;
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div class="loading">Yuklanmoqda...</div>
+  </div>
+
+  <script>
+    const tg = window.Telegram.WebApp;
+    tg.ready();
+    tg.expand();
+
+    const BASE_URL = window.location.origin;
+    const userId = tg.initDataUnsafe?.user?.id;
+
+    let stats = { users: 0, banned: 0 };
+    let isAdmin = false;
+
+    async function checkAdmin() {
+      try {
+        const res = await fetch(BASE_URL + '/api/check-admin?user_id=' + userId);
+        const data = await res.json();
+        return data.is_admin;
+      } catch { return false; }
+    }
+
+    async function loadStats() {
+      try {
+        const res = await fetch(BASE_URL + '/api/stats?user_id=' + userId);
+        const data = await res.json();
+        stats = data;
+        document.getElementById('user-count').textContent = data.users;
+        document.getElementById('ban-count').textContent = data.banned;
+      } catch {}
+    }
+
+    async function broadcast() {
+      const text = document.getElementById('broadcast-text').value.trim();
+      const msgEl = document.getElementById('broadcast-msg');
+      if (!text) { msgEl.className = 'msg err'; msgEl.textContent = 'Matn yozing!'; return; }
+      msgEl.className = 'msg ok'; msgEl.textContent = 'Yuborilmoqda...';
+      try {
+        const res = await fetch(BASE_URL + '/api/broadcast', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ user_id: userId, text })
+        });
+        const data = await res.json();
+        msgEl.textContent = data.sent + ' ta foydalanuvchiga yuborildi!';
+        document.getElementById('broadcast-text').value = '';
+      } catch { msgEl.className = 'msg err'; msgEl.textContent = 'Xatolik!'; }
+    }
+
+    async function banUser() {
+      const id = document.getElementById('ban-id').value.trim();
+      const msgEl = document.getElementById('ban-msg');
+      if (!id) { msgEl.className = 'msg err'; msgEl.textContent = 'ID yozing!'; return; }
+      try {
+        const res = await fetch(BASE_URL + '/api/ban', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ user_id: userId, target_id: parseInt(id) })
+        });
+        const data = await res.json();
+        msgEl.className = 'msg ok'; msgEl.textContent = id + ' banlandi!';
+        document.getElementById('ban-id').value = '';
+        loadStats();
+      } catch { msgEl.className = 'msg err'; msgEl.textContent = 'Xatolik!'; }
+    }
+
+    async function unbanUser() {
+      const id = document.getElementById('ban-id').value.trim();
+      const msgEl = document.getElementById('ban-msg');
+      if (!id) { msgEl.className = 'msg err'; msgEl.textContent = 'ID yozing!'; return; }
+      try {
+        const res = await fetch(BASE_URL + '/api/unban', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ user_id: userId, target_id: parseInt(id) })
+        });
+        msgEl.className = 'msg ok'; msgEl.textContent = id + ' ban ochildi!';
+        document.getElementById('ban-id').value = '';
+        loadStats();
+      } catch { msgEl.className = 'msg err'; msgEl.textContent = 'Xatolik!'; }
+    }
+
+    function renderAdmin() {
+      document.getElementById('app').innerHTML = `
+        <div class="header">
+          <div class="logo">👤</div>
+          <div>
+            <h1>Shadow AI</h1>
+            <p>Admin panel</p>
+          </div>
+        </div>
+
+        <div class="stats">
+          <div class="stat-card">
+            <div class="num" id="user-count">...</div>
+            <div class="label">Foydalanuvchilar</div>
+          </div>
+          <div class="stat-card">
+            <div class="num" id="ban-count">...</div>
+            <div class="label">Banlangan</div>
+          </div>
+        </div>
+
+        <div class="section">
+          <h3>Broadcast — Hammaga xabar</h3>
+          <textarea id="broadcast-text" placeholder="Xabar yozing..."></textarea>
+          <button class="btn-primary" onclick="broadcast()">Yuborish</button>
+          <div id="broadcast-msg" class="msg" style="display:none"></div>
+        </div>
+
+        <div class="section">
+          <h3>Ban / Unban</h3>
+          <input id="ban-id" type="number" placeholder="Foydalanuvchi ID">
+          <div style="display:flex; gap:8px; margin-top:10px">
+            <button class="btn-danger" style="margin:0" onclick="banUser()">Ban</button>
+            <button class="btn-success" style="margin:0" onclick="unbanUser()">Unban</button>
+          </div>
+          <div id="ban-msg" class="msg"></div>
+        </div>
+      `;
+
+      document.getElementById('broadcast-msg').style.display = 'block';
+      loadStats();
+      setInterval(loadStats, 10000);
+    }
+
+    function renderDenied() {
+      document.getElementById('app').innerHTML = `
+        <div class="header">
+          <div class="logo">👤</div>
+          <div><h1>Shadow AI</h1><p>Admin panel</p></div>
+        </div>
+        <div class="access-denied">
+          <h2>Kirish taqiqlangan</h2>
+          <p>Bu panel faqat admin uchun</p>
+        </div>
+      `;
+    }
+
+    async function init() {
+      isAdmin = await checkAdmin();
+      if (isAdmin) renderAdmin();
+      else renderDenied();
+    }
+
+    init();
+  </script>
+</body>
+</html>
