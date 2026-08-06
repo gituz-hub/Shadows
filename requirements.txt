@@ -1,4 +1,0 @@
-aiogram==3.13.0
-httpx
-aiohttp
-edge-tts
