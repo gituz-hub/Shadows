@@ -51,8 +51,6 @@ O'zbek tilida ravon, sarkastik va ochiq gapir. Javob oxirida 1 ta emoji."""
 class Form(StatesGroup):
     chatting = State()
 
-# ─── Gemini ───────────────────────────────────────────────────────────────────
-
 def get_gemini_url():
     key = GEMINI_KEYS[key_index % len(GEMINI_KEYS)]
     return f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={key}"
@@ -83,46 +81,22 @@ def ask_ai(history, admin=False):
             continue
         raise Exception(str(data.get("error", data)))
 
-    # Gemini limit tugadi — Groq zaxirasi
-    if GROQ_KEY:
-        groq_messages = [{"role": "system", "content": prompt}]
-        for m in history:
-            if not m.get("content") or not str(m["content"]).strip():
-                continue
-            role = "user" if m["role"] == "user" else "assistant"
-            groq_messages.append({"role": role, "content": str(m["content"])})
-        resp = httpx.post(
-            "https://api.groq.com/openai/v1/chat/completions",
-            headers={"Authorization": f"Bearer {GROQ_KEY}", "Content-Type": "application/json"},
-            json={"model": "llama-3.3-70b-versatile", "messages": groq_messages, "max_tokens": 500},
-            timeout=60
-        )
-        data = resp.json()
-        if "choices" in data:
-            return data["choices"][0]["message"]["content"]
-
     raise Exception("Limit tugadi")
 
-# ─── Ovoz ─────────────────────────────────────────────────────────────────────
-
 async def speech_to_text(file_path: str) -> str:
-    """Groq Whisper — ovozni matnga aylantirish (bepul)"""
     with open(file_path, "rb") as f:
         resp = httpx.post(
             "https://api.groq.com/openai/v1/audio/transcriptions",
             headers={"Authorization": f"Bearer {GROQ_KEY}"},
             files={"file": ("voice.ogg", f, "audio/ogg")},
-            data={"model": "whisper-large-v3", "language": "uz"},
+            data={"model": "whisper-large-v3", "language": "ru"},
             timeout=60
         )
     return resp.json().get("text", "")
 
 async def text_to_speech(text: str, output_path: str):
-    """edge-tts — matnni O'zbek ovoziga aylantirish (bepul)"""
     clean = "".join(c for c in text if ord(c) < 0x10000)
     await edge_tts.Communicate(clean, "uz-UZ-SardorNeural").save(output_path)
-
-# ─── Yordamchi ────────────────────────────────────────────────────────────────
 
 def is_admin(user_id): return user_id == ADMIN_ID
 
@@ -160,8 +134,6 @@ def admin_kb():
         kb.button(text="Admin panel", web_app=WebAppInfo(url=WEBAPP_URL))
     kb.adjust(2)
     return kb.as_markup()
-
-# ─── Handlers ─────────────────────────────────────────────────────────────────
 
 @dp.message(CommandStart())
 async def cmd_start(msg: Message, state: FSMContext):
@@ -231,14 +203,12 @@ async def cmd_unban(msg: Message):
         await msg.answer(f"{uid} ban ochildi!")
     except: await msg.answer("ID yozing: /unban 123456789")
 
-# ─── Ovoz handler ─────────────────────────────────────────────────────────────
-
 @dp.message(Form.chatting, F.voice)
 async def handle_voice(msg: Message, state: FSMContext):
     if msg.from_user.id in banned:
         await msg.answer("Sen ban qilingansan"); return
     if not GROQ_KEY:
-        await msg.answer("Ovoz uchun GROQ_API_KEY kerak"); return
+        await msg.answer("⚠️ Texnik"); return
 
     thinking = await msg.answer("🎤...")
     try:
@@ -277,8 +247,6 @@ async def handle_voice(msg: Message, state: FSMContext):
         print(f"Error: {e}")
         await thinking.edit_text("⚠️ Texnik")
 
-# ─── Matn handler ─────────────────────────────────────────────────────────────
-
 @dp.message(Form.chatting)
 async def chat(msg: Message, state: FSMContext):
     if msg.from_user.id in banned:
@@ -290,8 +258,6 @@ async def no_state(msg: Message):
     if msg.from_user.id in banned: return
     users.add(msg.from_user.id)
     await msg.answer("/start bos")
-
-# ─── Web API ──────────────────────────────────────────────────────────────────
 
 async def handle_index(request):
     path = os.path.join(os.path.dirname(__file__), "index.html")
@@ -326,8 +292,6 @@ async def handle_unban(request):
     if data.get("user_id") != ADMIN_ID: return web.json_response({"error": "forbidden"}, status=403)
     banned.discard(data["target_id"])
     return web.json_response({"ok": True})
-
-# ─── Main ─────────────────────────────────────────────────────────────────────
 
 async def main():
     app = web.Application()
